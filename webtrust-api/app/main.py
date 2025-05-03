@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg
+from pydantic import BaseModel
+
+class UrlRequest(BaseModel):
+    url: str
 
 app = FastAPI()
 
@@ -16,3 +20,13 @@ app.add_middleware(
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
+
+@app.post("/analyze")
+async def analyze(request: UrlRequest):
+    """
+    URLを分析するエンドポイント
+    """
+    return {
+        "status": "ok",
+        "message": "This is a sample analysis."
+    }
