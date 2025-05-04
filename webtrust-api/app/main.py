@@ -5,7 +5,12 @@ from pydantic import BaseModel
 import whois
 from urllib.parse import urlparse
 import json
+import requests
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class UrlRequest(BaseModel):
     url: str
@@ -27,6 +32,58 @@ def json_serial(obj):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
 
+def check_url_safety(url):
+    """
+    Google Safe Browsing APIを使用してURLの安全性を確認する
+    """
+    api_key = os.getenv("GOOGLE_SAFE_BROWSING_KEY")
+    if not api_key:
+        return {
+            "threat": False,
+            "error": "APIキーが設定されていません"
+        }
+    
+    api_url = f"https://safebrowsing.googleapis.com/v4/threatMatches:find?key={api_key}"
+    
+    payload = {
+        "client": {
+            "clientId": "webtrust-api",
+            "clientVersion": "1.0.0"
+        },
+        "threatInfo": {
+            "threatTypes": [
+                "MALWARE", 
+                "SOCIAL_ENGINEERING",
+                "UNWANTED_SOFTWARE",
+                "POTENTIALLY_HARMFUL_APPLICATION"
+            ],
+            "platformTypes": ["ANY_PLATFORM"],
+            "threatEntryTypes": ["URL"],
+            "threatEntries": [{"url": url}]
+        }
+    }
+    
+    try:
+        response = requests.post(api_url, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        
+        if "matches" in data and len(data["matches"]) > 0:
+            threat_types = [match.get("threatType") for match in data["matches"]]
+            return {
+                "threat": True,
+                "threat_types": threat_types
+            }
+        else:
+            return {
+                "threat": False
+            }
+    except Exception as e:
+        return {
+            "threat": False,
+            "error": f"APIリクエストエラー: {str(e)}"
+        }
+
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
@@ -45,16 +102,20 @@ async def analyze(request: UrlRequest):
         
         if domain.startswith('www.'):
             domain = domain[4:]
-            
-        whois_info = whois.whois(domain)
         
+        whois_info = whois.whois(domain)
         whois_data = json.loads(json.dumps(whois_info, default=json_serial))
+        
+        safety_check = check_url_safety(request.url)
         
         return {
             "status": "ok",
             "message": "This is a sample analysis.",
             "domain": domain,
-            "whois": whois_data
+            "whois": whois_data,
+            "threat": safety_check.get("threat", False),
+            "threat_types": safety_check.get("threat_types", []),
+            "safety_error": safety_check.get("error")
         }
     except Exception as e:
         return {

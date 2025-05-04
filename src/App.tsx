@@ -5,6 +5,7 @@ import { Input } from './components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './components/ui/card'
 import { Alert, AlertDescription } from './components/ui/alert'
 import { Separator } from './components/ui/separator'
+import { Shield, ShieldAlert, ShieldCheck } from 'lucide-react'
 
 interface WhoisResult {
   domain_name?: string | string[];
@@ -33,6 +34,9 @@ interface AnalysisResult {
   message: string;
   domain?: string;
   whois?: WhoisResult;
+  threat?: boolean;
+  threat_types?: string[];
+  safety_error?: string;
 }
 
 function App() {
@@ -76,6 +80,61 @@ function App() {
       return '情報なし'
     } else {
       return String(value)
+    }
+  }
+
+  const translateThreatType = (threatType: string): string => {
+    const threatTypes: Record<string, string> = {
+      'MALWARE': 'マルウェア',
+      'SOCIAL_ENGINEERING': 'ソーシャルエンジニアリング',
+      'UNWANTED_SOFTWARE': '不要なソフトウェア',
+      'POTENTIALLY_HARMFUL_APPLICATION': '潜在的に有害なアプリケーション'
+    }
+    return threatTypes[threatType] || threatType
+  }
+
+  const renderSafetyInfo = () => {
+    if (result?.safety_error) {
+      return (
+        <Alert className="mt-4 bg-yellow-50 border-yellow-200">
+          <Shield className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            安全性の確認中にエラーが発生しました: {result.safety_error}
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (result?.threat === undefined) return null
+
+    if (result.threat) {
+      return (
+        <Alert className="mt-4 bg-red-50 border-red-200">
+          <ShieldAlert className="h-4 w-4 text-red-600" />
+          <div className="ml-2">
+            <h4 className="font-medium text-red-800">危険なサイトの可能性があります</h4>
+            {result.threat_types && result.threat_types.length > 0 && (
+              <div className="mt-1 text-sm text-red-700">
+                <p>検出された脅威:</p>
+                <ul className="list-disc pl-5 mt-1">
+                  {result.threat_types.map((type, index) => (
+                    <li key={index}>{translateThreatType(type)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </Alert>
+      )
+    } else {
+      return (
+        <Alert className="mt-4 bg-green-50 border-green-200">
+          <ShieldCheck className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            このサイトは安全です。脅威は検出されませんでした。
+          </AlertDescription>
+        </Alert>
+      )
     }
   }
 
@@ -153,6 +212,8 @@ function App() {
                   <p><span className="font-medium">ドメイン:</span> {result.domain}</p>
                 </div>
               )}
+              
+              {renderSafetyInfo()}
               
               {result.whois && (
                 <>
