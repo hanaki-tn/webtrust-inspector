@@ -29,6 +29,19 @@ interface WhoisResult {
   [key: string]: any;
 }
 
+interface CertificateInfo {
+  common_name?: string;
+  issuer?: {
+    common_name?: string;
+    organization?: string;
+    country?: string;
+  };
+  valid_from?: string;
+  valid_to?: string;
+  subject_alt_names?: string[];
+  error?: string;
+}
+
 interface AnalysisResult {
   status: string;
   message: string;
@@ -37,6 +50,7 @@ interface AnalysisResult {
   threat?: boolean;
   threat_types?: string[];
   safety_error?: string;
+  certificate?: CertificateInfo;
 }
 
 function App() {
@@ -138,6 +152,85 @@ function App() {
     }
   }
 
+  const renderCertificateInfo = () => {
+    if (!result?.certificate) return null
+    
+    const cert = result.certificate
+    
+    if (cert.error) {
+      return (
+        <div className="mt-4">
+          <h3 className="font-medium mb-2">SSL/TLS証明書情報:</h3>
+          <Alert className="bg-yellow-50 border-yellow-200">
+            <AlertDescription className="text-yellow-800">
+              {cert.error}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )
+    }
+    
+    const formatDate = (dateStr?: string) => {
+      if (!dateStr) return '情報なし'
+      try {
+        const date = new Date(dateStr)
+        return date.toLocaleString('ja-JP', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      } catch (e) {
+        return dateStr
+      }
+    }
+    
+    return (
+      <div className="mt-4">
+        <h3 className="font-medium mb-2">SSL/TLS証明書情報:</h3>
+        <div className="text-sm space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="font-medium">コモンネーム (CN):</div>
+            <div className="col-span-2">{cert.common_name || '情報なし'}</div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2">
+            <div className="font-medium">発行者:</div>
+            <div className="col-span-2">
+              {cert.issuer ? (
+                <>
+                  {cert.issuer.organization && <div>組織: {cert.issuer.organization}</div>}
+                  {cert.issuer.common_name && <div>名前: {cert.issuer.common_name}</div>}
+                  {cert.issuer.country && <div>国: {cert.issuer.country}</div>}
+                </>
+              ) : '情報なし'}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2">
+            <div className="font-medium">有効期間開始:</div>
+            <div className="col-span-2">{formatDate(cert.valid_from)}</div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2">
+            <div className="font-medium">有効期間終了:</div>
+            <div className="col-span-2">{formatDate(cert.valid_to)}</div>
+          </div>
+          
+          {cert.subject_alt_names && cert.subject_alt_names.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="font-medium">代替名 (SANs):</div>
+              <div className="col-span-2">
+                {cert.subject_alt_names.join(', ')}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   const renderWhoisInfo = () => {
     if (!result?.whois) return null
 
@@ -214,6 +307,13 @@ function App() {
               )}
               
               {renderSafetyInfo()}
+              
+              {result.certificate && (
+                <>
+                  <Separator className="my-4" />
+                  {renderCertificateInfo()}
+                </>
+              )}
               
               {result.whois && (
                 <>

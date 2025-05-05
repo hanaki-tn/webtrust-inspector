@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 import json
 import requests
 import os
+import ssl
+import socket
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -31,6 +33,56 @@ def json_serial(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
+
+def get_ssl_certificate(url):
+    """
+    URLからSSL/TLS証明書情報を取得する
+    """
+    parsed_url = urlparse(url)
+    
+    if parsed_url.scheme != 'https':
+        return None
+    
+    hostname = parsed_url.netloc
+    port = 443  # HTTPSのデフォルトポート
+    
+    try:
+        context = ssl.create_default_context()
+        with socket.create_connection((hostname, port), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                cert = ssock.getpeercert()
+                
+                result = {
+                    "common_name": None,
+                    "issuer": {},
+                    "valid_from": cert.get("notBefore"),
+                    "valid_to": cert.get("notAfter"),
+                    "subject_alt_names": []
+                }
+                
+                for item in cert.get("subject", []):
+                    for key, value in item:
+                        if key == "commonName":
+                            result["common_name"] = value
+                
+                for item in cert.get("issuer", []):
+                    for key, value in item:
+                        if key == "commonName":
+                            result["issuer"]["common_name"] = value
+                        elif key == "organizationName":
+                            result["issuer"]["organization"] = value
+                        elif key == "countryName":
+                            result["issuer"]["country"] = value
+                
+                for ext in cert.get("subjectAltName", []):
+                    if ext[0] == "DNS":
+                        result["subject_alt_names"].append(ext[1])
+                
+                return result
+    except Exception as e:
+        return {
+            "error": f"証明書取得エラー: {str(e)}"
+        }
 
 def check_url_safety(url):
     """
@@ -108,7 +160,9 @@ async def analyze(request: UrlRequest):
         
         safety_check = check_url_safety(request.url)
         
-        return {
+        certificate_info = get_ssl_certificate(request.url)
+        
+        response = {
             "status": "ok",
             "message": "This is a sample analysis.",
             "domain": domain,
@@ -117,6 +171,11 @@ async def analyze(request: UrlRequest):
             "threat_types": safety_check.get("threat_types", []),
             "safety_error": safety_check.get("error")
         }
+        
+        if certificate_info:
+            response["certificate"] = certificate_info
+        
+        return response
     except Exception as e:
         return {
             "status": "error",
