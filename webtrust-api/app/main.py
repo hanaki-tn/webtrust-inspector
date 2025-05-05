@@ -135,6 +135,45 @@ def check_url_safety(url):
             "threat": False,
             "error": f"APIリクエストエラー: {str(e)}"
         }
+        
+def check_phishing(url):
+    """
+    PhishTank APIを使用してURLがフィッシングサイトかどうかを確認する
+    """
+    try:
+        api_url = "http://checkurl.phishtank.com/checkurl/"
+        
+        payload = {
+            "url": url,
+            "format": "json"
+        }
+        
+        headers = {
+            "User-Agent": "webtrust-api/1.0"
+        }
+        
+        response = requests.post(api_url, data=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        
+        if "results" in data and "in_database" in data["results"]:
+            is_phishing = data["results"]["in_database"] and data["results"]["verified"]
+            detail_url = data["results"].get("phish_detail_url", "")
+            
+            return {
+                "phishing": is_phishing,
+                "phish_detail_url": detail_url if is_phishing else ""
+            }
+        else:
+            return {
+                "phishing": False,
+                "error": "PhishTank APIからの応答が不正です"
+            }
+    except Exception as e:
+        return {
+            "phishing": False,
+            "error": f"PhishTank APIリクエストエラー: {str(e)}"
+        }
 
 @app.get("/healthz")
 async def healthz():
@@ -159,7 +198,7 @@ async def analyze(request: UrlRequest):
         whois_data = json.loads(json.dumps(whois_info, default=json_serial))
         
         safety_check = check_url_safety(request.url)
-        
+        phishing_check = check_phishing(request.url)
         certificate_info = get_ssl_certificate(request.url)
         
         response = {
@@ -169,7 +208,10 @@ async def analyze(request: UrlRequest):
             "whois": whois_data,
             "threat": safety_check.get("threat", False),
             "threat_types": safety_check.get("threat_types", []),
-            "safety_error": safety_check.get("error")
+            "safety_error": safety_check.get("error"),
+            "phishing": phishing_check.get("phishing", False),
+            "phish_detail_url": phishing_check.get("phish_detail_url", ""),
+            "phishing_error": phishing_check.get("error")
         }
         
         if certificate_info:

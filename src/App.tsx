@@ -5,7 +5,7 @@ import { Input } from './components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './components/ui/card'
 import { Alert, AlertDescription } from './components/ui/alert'
 import { Separator } from './components/ui/separator'
-import { Shield, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, ExternalLink } from 'lucide-react'
 
 interface WhoisResult {
   domain_name?: string | string[];
@@ -51,6 +51,9 @@ interface AnalysisResult {
   threat_types?: string[];
   safety_error?: string;
   certificate?: CertificateInfo;
+  phishing?: boolean;
+  phish_detail_url?: string;
+  phishing_error?: string;
 }
 
 function App() {
@@ -146,6 +149,53 @@ function App() {
           <ShieldCheck className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800">
             このサイトは安全です。脅威は検出されませんでした。
+          </AlertDescription>
+        </Alert>
+      )
+    }
+  }
+  
+  const renderPhishingInfo = () => {
+    if (result?.phishing_error) {
+      return (
+        <Alert className="mt-4 bg-yellow-50 border-yellow-200">
+          <Shield className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            フィッシング確認中にエラーが発生しました: {result.phishing_error}
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (result?.phishing === undefined) return null
+
+    if (result.phishing) {
+      return (
+        <Alert className="mt-4 bg-red-50 border-red-200">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <div className="ml-2">
+            <h4 className="font-medium text-red-800">フィッシングサイトとして検出されました</h4>
+            {result.phish_detail_url && (
+              <div className="mt-1 text-sm text-red-700">
+                <a 
+                  href={result.phish_detail_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center text-red-700 hover:text-red-900"
+                >
+                  詳細情報を見る <ExternalLink className="h-3 w-3 ml-1" />
+                </a>
+              </div>
+            )}
+          </div>
+        </Alert>
+      )
+    } else {
+      return (
+        <Alert className="mt-4 bg-green-50 border-green-200">
+          <ShieldCheck className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            このサイトはPhishTankのデータベースに登録されていません。
           </AlertDescription>
         </Alert>
       )
@@ -307,6 +357,8 @@ function App() {
               )}
               
               {renderSafetyInfo()}
+              
+              {renderPhishingInfo()}
               
               {result.certificate && (
                 <>
