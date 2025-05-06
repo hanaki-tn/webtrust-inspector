@@ -54,6 +54,11 @@ interface AnalysisResult {
   phishing?: boolean;
   phish_detail_url?: string;
   phishing_error?: string;
+  ai_risk_score?: number;
+  ai_summary?: string;
+  ai_judgment?: string;
+  ai_error?: boolean;
+  error_message?: string;
 }
 
 function App() {
@@ -314,6 +319,78 @@ function App() {
       </div>
     )
   }
+  
+  const renderAIAssessment = () => {
+    if (result?.ai_error) {
+      return (
+        <Alert className="mt-4 bg-yellow-50 border-yellow-200">
+          <Shield className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            AIリスク評価中にエラーが発生しました: {result.error_message || 'APIエラー'}
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (!result?.ai_risk_score && !result?.ai_summary && !result?.ai_judgment) return null
+
+    const getJudgmentColor = () => {
+      switch (result?.ai_judgment) {
+        case '安全':
+          return {
+            bg: 'bg-green-50',
+            border: 'border-green-200',
+            text: 'text-green-800',
+            icon: <ShieldCheck className="h-4 w-4 text-green-600" />
+          }
+        case '注意':
+          return {
+            bg: 'bg-yellow-50',
+            border: 'border-yellow-200',
+            text: 'text-yellow-800',
+            icon: <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          }
+        case '危険':
+          return {
+            bg: 'bg-red-50',
+            border: 'border-red-200',
+            text: 'text-red-800',
+            icon: <ShieldAlert className="h-4 w-4 text-red-600" />
+          }
+        default:
+          return {
+            bg: 'bg-blue-50',
+            border: 'border-blue-200',
+            text: 'text-blue-800',
+            icon: <Shield className="h-4 w-4 text-blue-600" />
+          }
+      }
+    }
+
+    const colors = getJudgmentColor()
+
+    return (
+      <div className="mt-4">
+        <h3 className="font-medium mb-2">AIリスク評価:</h3>
+        <Alert className={`${colors.bg} ${colors.border}`}>
+          {colors.icon}
+          <div className="ml-2">
+            <h4 className={`font-medium ${colors.text}`}>判定: {result.ai_judgment}</h4>
+            <div className="mt-1 text-sm">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="font-medium">リスクスコア:</div>
+                <div className="col-span-2">{result.ai_risk_score}/100</div>
+              </div>
+              <div className="mt-2">
+                <div className="font-medium mb-1">要約:</div>
+                <div>{result.ai_summary}</div>
+              </div>
+            </div>
+          </div>
+        </Alert>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -371,6 +448,13 @@ function App() {
                 <>
                   <Separator className="my-4" />
                   {renderWhoisInfo()}
+                </>
+              )}
+              
+              {(result.ai_risk_score !== undefined || result.ai_error) && (
+                <>
+                  <Separator className="my-4" />
+                  {renderAIAssessment()}
                 </>
               )}
             </div>

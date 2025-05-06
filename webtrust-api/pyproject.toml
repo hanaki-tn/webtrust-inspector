@@ -12,6 +12,7 @@ psycopg = {extras = ["binary"], version = "^3.2.7"}
 python-whois = "^0.9.5"
 requests = "^2.32.3"
 python-dotenv = "^1.1.0"
+openai = "^1.77.0"
 
 
 [build-system]
